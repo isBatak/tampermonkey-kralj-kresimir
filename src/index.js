@@ -8,7 +8,38 @@
 // @match        http://www.s-1.hr/dnevni.html.php
 // ==/UserScript==
 
-(function() {
+
+var Store = function() {
+  this.state = null;
+  this.reducer = null;
+  this.listeners = [];
+};
+
+Store.prototype.dispatch = function(action) {
+  this.state = this.reducer(this.state, action);
+  this.listeners.forEach(function(listener) {
+    listener();
+  });
+};
+
+Store.prototype.createStore = function(reducer) {
+  this.reducer = reducer;
+  this.state = this.reducer(null, {});
+}
+
+Store.prototype.getState = function() {
+  return this.state;
+}
+
+Store.prototype.subscribe = function(listener) {
+  this.listeners.push(listener);
+  return function unsubscribe() {
+    var index = this.listeners.indexOf(listener);
+    this.listeners.splice(index, 1);
+  }
+};
+
+(function(store) {
     'use strict';
 
     var selector = {
@@ -42,6 +73,37 @@
     var $rows = $('.rednibroj').parent('tr');
     var rowsCount = $rows.length;
 
+    var reducer = function(state, action){
+      if (!state) {
+        state = {};
+      }
+      switch (action.type) {
+        case 'ADD':
+          var newState = Object.assign({}, state);
+          newState[action.id] = {
+            active: false,
+            quantity: action.quantity,
+            name: action.name,
+            price: action.price
+          }
+          return newState;
+
+        case 'TOGGLE':
+          var newState = Object.assign({}, state);
+          var item = newState[action.id];
+          if (item) {
+            item.active = !item.active;
+          }
+          newState[action.id] = item;
+          return newState;
+
+        default:
+          return state;
+      }
+    };
+
+    store.createStore(reducer);
+
     /**
      *
      */
@@ -71,26 +133,68 @@
     /**
      *
      */
-    function injectControls($element) {
+    function injectControls($element, id) {
       var $orderNumber = $element.find(selector.orderNumber);
-      $orderNumber.prepend($checkbox.clone(true));
+      var $checkboxClone = $checkbox.clone(true);
+      $checkboxClone.on('click', function() {
+        store.dispatch({
+          type: 'TOGGLE',
+          id: id
+        });
+      });
+      $orderNumber.prepend($checkboxClone);
 
       var $mealTitle = $element.find(selector.mealTitle);
 
       var $price = $element.find(selector.price).eq(1);
       $price.append($quantity.clone(true));
+
+      store.dispatch({
+        type: 'ADD',
+        id: id,
+        quantity: 0,
+        name: $orderNumber.text() + ' ' + $mealTitle.text(),
+        price: $price.text()
+      });
+
+      var currentActiveState;
+      store.subscribe(function(){
+        var previousActiveState = currentActiveState;
+        var currentActiveState = store.getState()[id].active;
+        if (currentActiveState !== currentActiveState) {
+          console.log(state[id]);
+        }
+      });
+
+      $element.on('click', function() {
+        store.dispatch({
+          type: 'TOGGLE',
+          id: id
+        });
+        console.log(store.getState()[id].active);
+      });
     }
 
     $rows.each(function(index, element) {
       var $element = $(element);
 
-      injectControls($element);
+      injectControls($element, index);
 
-      console.log(index, rowsCount - 1);
       if (index == rowsCount - 1) {
         addAdditionalRows($element);
       }
     });
 
+    $rows
+      .css('cursor', 'pointer')
+      .hover(
+        function(event){
+          $(event.currentTarget).css('text-decoration', 'underline');
+        },
+        function (event) {
+          $(event.currentTarget).css('text-decoration', '');
+        }
+      );
+
     initButtons();
-})();
+})(new Store());
