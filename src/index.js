@@ -53,7 +53,7 @@ Store.prototype.subscribe = function(listener) {
         '<td></td>' +
         '<td></td>' +
         '<td>UKUPNO:</td>' +
-        '<td id="totla" style="text-align:center; font-weight:bold; font-size: 20px;">0,00 kn</td>' +
+        '<td id="total" style="text-align:center; font-weight:bold; font-size: 20px;">0,00 kn</td>' +
       '</tr>' +
     '');
     var $total = $infoRow.find('#total');
@@ -93,8 +93,22 @@ Store.prototype.subscribe = function(listener) {
           var item = newState[action.id];
           if (item) {
             item.active = !item.active;
+            item.quantity = item.active ? 1 : 0;
           }
           newState[action.id] = item;
+          return newState;
+
+        case 'QUANTITY_CHANGE':
+          var newState = Object.assign({}, state);
+          var item = newState[action.id];
+          if (item) {
+            item.quantity = action.quantity;
+            if (action.quantity == 0) {
+              item.active = false;
+            } else {
+              item.active = true;
+            }
+          }
           return newState;
 
         default:
@@ -103,6 +117,25 @@ Store.prototype.subscribe = function(listener) {
     };
 
     store.createStore(reducer);
+
+    /**
+     *
+     */
+    function observeStore(store, select, onChange) {
+      var currentState;
+
+      function handleChange() {
+        var nextState = select(store.getState());
+        if (nextState !== currentState) {
+          currentState = nextState;
+          onChange(currentState);
+        }
+      }
+
+      var unsubscribe = store.subscribe(handleChange);
+      handleChange();
+      return unsubscribe;
+    }
 
     /**
      *
@@ -130,13 +163,33 @@ Store.prototype.subscribe = function(listener) {
         .after($infoRow);
     }
 
+    function priceToFloat(price) {
+      return parseFloat(price.replace(',', '.').replace(/ kn/g, ''));
+    }
+
+    function floatToPrice(float) {
+      return float.toFixed(2).replace('.', ',') + ' kn';
+    }
+
+    function getTotalPrice() {
+      var state = store.getState();
+      var total = 0.00;
+      for (var prop in state) {
+        var item = state[prop];
+        if (item.active) {
+          total += item.price * item.quantity;
+        }
+      }
+      return floatToPrice(total);
+    }
+
     /**
      *
      */
     function injectControls($element, id) {
       var $orderNumber = $element.find(selector.orderNumber);
       var $checkboxClone = $checkbox.clone(true);
-      $checkboxClone.on('click', function() {
+      $checkboxClone.change(function() {
         store.dispatch({
           type: 'TOGGLE',
           id: id
@@ -147,32 +200,47 @@ Store.prototype.subscribe = function(listener) {
       var $mealTitle = $element.find(selector.mealTitle);
 
       var $price = $element.find(selector.price).eq(1);
-      $price.append($quantity.clone(true));
+      var $quantityClone = $quantity.clone(true);
+      $quantityClone.on('change textInput input', function(event) {
+        var $target = $(event.target);
+        store.dispatch({
+          type: 'QUANTITY_CHANGE',
+          id: id,
+          quantity: $target.val()
+        });
+      });
+      $price.append($quantityClone);
 
       store.dispatch({
         type: 'ADD',
         id: id,
         quantity: 0,
         name: $orderNumber.text() + ' ' + $mealTitle.text(),
-        price: $price.text()
+        price: priceToFloat($price.text())
       });
 
-      var currentActiveState;
-      store.subscribe(function(){
-        var previousActiveState = currentActiveState;
-        var currentActiveState = store.getState()[id].active;
-        if (currentActiveState !== currentActiveState) {
-          console.log(state[id]);
+      var unsubscribeQuantityObserver = observeStore(
+        store,
+        function select(state) {
+          return state[id].quantity
+        },
+        function onChange(quantity) {
+          console.log(quantity);
+          $quantityClone.val(quantity);
+          $total.text(getTotalPrice());
         }
-      });
+      );
 
-      $element.on('click', function() {
-        store.dispatch({
-          type: 'TOGGLE',
-          id: id
-        });
-        console.log(store.getState()[id].active);
-      });
+      var unsubscribeActiveObserver = observeStore(
+        store,
+        function select(state) {
+          return state[id].active
+        },
+        function onChange(active) {
+          console.log(id, store.getState()[id].active);
+          $checkboxClone.prop('checked', active);
+        }
+      );
     }
 
     $rows.each(function(index, element) {
@@ -184,6 +252,8 @@ Store.prototype.subscribe = function(listener) {
         addAdditionalRows($element);
       }
     });
+
+    console.log(store.getState());
 
     $rows
       .css('cursor', 'pointer')
