@@ -51,9 +51,8 @@ Store.prototype.subscribe = function(listener) {
     var $infoRow = $('' +
       '<tr>' +
         '<td></td>' +
-        '<td></td>' +
         '<td>UKUPNO:</td>' +
-        '<td id="total" style="text-align:center; font-weight:bold; font-size: 20px;">0,00 kn</td>' +
+        '<td id="total" colspan="2" style="text-align:right; font-weight:bold; font-size: 20px;">0,00 kn</td>' +
       '</tr>' +
     '');
     var $total = $infoRow.find('#total');
@@ -68,7 +67,7 @@ Store.prototype.subscribe = function(listener) {
     var $buttonOrder = $('<button/>', { text: 'ORDER!' });
 
     var $checkbox = $('<input/>', { type: 'checkbox' });
-    var $quantity = $('<input/>', { type: 'number', min: 0, step: 1, val: 0 , style: 'width: 20px; display: inline-block; float: right; margin-left: 5px;' });
+    var $quantity = $('<input/>', { type: 'number', min: 0, step: 1, val: 0 , style: 'width: 30px; display: inline-block; float: right; margin-left: 5px;' });
 
     var $rows = $('.rednibroj').parent('tr');
     var rowsCount = $rows.length;
@@ -200,6 +199,7 @@ Store.prototype.subscribe = function(listener) {
       var $mealTitle = $element.find(selector.mealTitle);
 
       var $price = $element.find(selector.price).eq(1);
+      $price.css('width','auto');
       var $quantityClone = $quantity.clone(true);
       $quantityClone.on('change textInput input', function(event) {
         var $target = $(event.target);
@@ -225,7 +225,6 @@ Store.prototype.subscribe = function(listener) {
           return state[id].quantity
         },
         function onChange(quantity) {
-          console.log(quantity);
           $quantityClone.val(quantity);
           $total.text(getTotalPrice());
         }
@@ -237,7 +236,6 @@ Store.prototype.subscribe = function(listener) {
           return state[id].active
         },
         function onChange(active) {
-          console.log(id, store.getState()[id].active);
           $checkboxClone.prop('checked', active);
         }
       );
@@ -252,8 +250,6 @@ Store.prototype.subscribe = function(listener) {
         addAdditionalRows($element);
       }
     });
-
-    console.log(store.getState());
 
     $rows
       .css('cursor', 'pointer')
