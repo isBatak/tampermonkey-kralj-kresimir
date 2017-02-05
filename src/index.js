@@ -1,43 +1,4 @@
-// ==UserScript==
-// @name         Kralj kresimir
-// @namespace    http://tampermonkey.net/
-// @version      0.1
-// @description  Simplifies ordering on 'Kralj Kresimir Catering' page
-// @author       Ivica Batinic
-// @require      https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js
-// @match        http://www.s-1.hr/dnevni.html.php
-// ==/UserScript==
-
-
-var Store = function() {
-  this.state = null;
-  this.reducer = null;
-  this.listeners = [];
-};
-
-Store.prototype.dispatch = function(action) {
-  this.state = this.reducer(this.state, action);
-  this.listeners.forEach(function(listener) {
-    listener();
-  });
-};
-
-Store.prototype.createStore = function(reducer) {
-  this.reducer = reducer;
-  this.state = this.reducer(null, {});
-}
-
-Store.prototype.getState = function() {
-  return this.state;
-}
-
-Store.prototype.subscribe = function(listener) {
-  this.listeners.push(listener);
-  return function unsubscribe() {
-    var index = this.listeners.indexOf(listener);
-    this.listeners.splice(index, 1);
-  }
-};
+var Store = require('./store');
 
 (function(store) {
     'use strict';
@@ -140,7 +101,23 @@ Store.prototype.subscribe = function(listener) {
      *
      */
     function onOrder(event) {
-      console.log(event);
+      var body = 'Jela:\r\n';
+      var state = store.getState();
+
+      for (var item in state) {
+        if (state.hasOwnProperty(item)) {
+          if(state[item].active) {
+            console.log(state[item].name + ' - komada ' + state[item].quantity);
+            body += state[item].name + ' - komada ' + state[item].quantity + '\r\n\r\n';
+          }
+        }
+      }
+
+      body += 'Adresa:\r\nStrojarska 22, Infinum, 13. kat';
+
+      var mailOpener = document.createElement('a');
+      mailOpener.setAttribute('href', 'mailto:s-1@inet.hr?Subject=Narudzba&Body=' + encodeURIComponent(body));
+      mailOpener.click();
     }
 
     /**
